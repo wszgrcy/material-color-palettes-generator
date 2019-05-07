@@ -2180,7 +2180,7 @@ var rgb2lab = function (a) {
         , e = .2126729 * b + .7151522 * c + .072175 * d;
     return new V(116 * W(e) - 16, 500 * (W((.4124564 * b + .3575761 * c + .1804375 * d) / .95047) - W(e)), 200 * (W(e) - W((.0193339 * b + .119192 * c + .9503041 * d) / 1.08883)), a.alpha)
 }
-    , wb = function (a, b, c, d) {
+    , wb = function (a, b, /**hue */c, /**alpha */d) {
         d = void 0 === d ? 1 : d;
         this.b = a;
         this.v = b;

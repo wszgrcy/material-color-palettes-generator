@@ -63,22 +63,9 @@ var Ab = function (a, b) {
 /**rgb颜色转换为lab颜色 */
 function rgb2lab(rgb: Rgb) {
     let chromaLab = chroma.gl(rgb.red, rgb.green, rgb.blue, rgb.alpha).lab()
-    console.log(chromaLab)
     return new Lab(...chromaLab)
-    // var b = R(rgb.red)
-    //     , c = R(rgb.green)
-    //     , d = R(rgb.blue)
-    //     , e = .2126729 * b + .7151522 * c + .072175 * d;
-    // return new Lab(116 * W(e) - 16, 500 * (W((.4124564 * b + .3575761 * c + .1804375 * d) / .95047) - W(e)), 200 * (W(e) - W((.0193339 * b + .119192 * c + .9503041 * d) / 1.08883)), rgb.alpha)
 }
-function R(a) {
-    return .04045 >= a ? a / 12.92 : Math.pow((a + .055) / 1.055, 2.4)
-}
-function W(a) {
-    var b = 6 / 29
-        , c = 1 / (3 * Math.pow(b, 2));
-    return a > Math.pow(b, 3) ? Math.pow(a, 1 / 3) : c * a + 4 / 29
-}
+
 
 
 function X(a) {
@@ -104,7 +91,7 @@ function X(a) {
         b = xb(b);
         var d = b.b - Cb[c] / t * l;
         d = Math.min(d, r);
-        c = new wb(A(d, 0, 100), Math.max(0, k ? b.v - m : b.v - m * Math.min(Db[c] / n, 1.25)), (b.hue - q + 360) % 360);
+        c = new Wb(A(d, 0, 100), Math.max(0, k ? b.v - m : b.v - m * Math.min(Db[c] / n, 1.25)), (b.hue - q + 360) % 360);
         r = Math.max(c.b - 1.7, 0);
         b = c.hue * Math.PI / 180;
         c = new Lab(c.b, c.v * Math.cos(b), c.v * Math.sin(b), c.alpha);
@@ -115,20 +102,33 @@ function X(a) {
         return new Rgb(A(yb(3.2404542 * b + -1.5371385 * d + -.4985314 * g), 0, 1), A(yb(-.969266 * b + 1.8760108 * d + .041556 * g), 0, 1), A(yb(.0556434 * b + -.2040259 * d + 1.0572252 * g), 0, 1), c.alpha)
     })
 }
-function xb(a) {
-    return new wb(a.b, Math.sqrt(Math.pow(a.i, 2) + Math.pow(a.j, 2)), (180 * Math.atan2(a.j, a.i) / Math.PI + 360) % 360, a.alpha)
+function xb(lab: Lab) {
+    return new Wb(lab.b, Math.sqrt(Math.pow(lab.i, 2) + Math.pow(lab.j, 2)), (180 * Math.atan2(lab.j, lab.i) / Math.PI + 360) % 360, lab.alpha)
 };
 
-function wb(a, b, c, d = 1) {
-    d = void 0 === d ? 1 : d;
-    this.b = a;
-    this.v = b;
-    this.hue = c;
-    this.alpha = d;
-    compareValue(a, Number.MAX_VALUE, "lightness");
-    compareValue(b, Number.MAX_VALUE, "chroma");
-    compareValue(c, 360, "hue");
-    compareValue(d, 1, "alpha")
+class Wb {
+    b
+    v
+    /**
+     *Creates an instance of Wb.
+     * @author cyia
+     * @date 2019-05-07
+     * @param a lightness
+     * @param b 
+     * @param hue hue
+     * @param [alpha=1]
+     */
+    constructor(a, b, public hue: number, public alpha = 1) {
+        alpha = alpha || 1; this.b = a;
+        this.v = b;
+        // this.hue = c;
+        // this.alpha = d;
+        compareValue(a, Number.MAX_VALUE, "lightness");
+        compareValue(b, Number.MAX_VALUE, "chroma");
+        compareValue(hue, 360, "hue");
+        compareValue(alpha, 1, "alpha")
+
+    }
 };
 
 /**
@@ -154,7 +154,7 @@ function yb(a) {
 }
 
 
-function lb(hsl: Hsl) {
+function hsl2rgb(hsl: Hsl) {
     var b = (1 - Math.abs(2 * hsl.lightness - 1)) * hsl.saturation;
     return kb(hsl.hue, hsl.alpha, b, Math.max(0, hsl.lightness - b / 2))
 }
@@ -203,36 +203,29 @@ function rb(a) {
     return new Hsl(d, e, g, a.alpha)
 }
 
-function bd(a) {
-    var b = []
-        , c = [];
-    a = w(a);
-    for (var d = a.next(); !d.done; d = a.next())
-        d = lb(d.value),
-            b.push(d),
-            c.push(X(d));
+/**
+ * 更有颜色生成列表
+ *
+ * @author cyia
+ * @date 2019-05-07
+ * @param hslList
+ * @returns
+ */
+function bd(hslList: Hsl[]) {
+    let sourceColorList = [];
+    let generatorColorList = [];
+    hslList.forEach((hsl) => {
+        let rgbColor = hsl2rgb(hsl);
+        sourceColorList.push(rgbColor);
+        generatorColorList.push(X(rgbColor));
+    })
     return {
-        Eb: b,
-        yb: c
+        sourceColorList,
+        generatorColorList
     }
 }
-function w(a) {
-    var b = "undefined" != typeof Symbol && Symbol.iterator && a[Symbol.iterator];
-    return b ? b.call(a) : {
-        next: aa(a)
-    }
-}
-function aa(a) {
-    var b = 0;
-    return function () {
-        return b < a.length ? {
-            done: !1,
-            value: a[b++]
-        } : {
-                done: !0
-            }
-    }
-}
+
+
 
 class Hsl {
     constructor(public hue: number, public saturation: number, public lightness: number, public alpha = 1) {
@@ -259,34 +252,89 @@ class Rgb {
         compareValue(blue, 1, "blue");
         compareValue(alpha, 1, "alpha")
 
+    }/**比较是否相等 */
+    isEqual(target) {
+        return Math.abs(this.red - target.red) < O && Math.abs(this.green - target.green) < O && Math.abs(this.blue - target.blue) < O && Math.abs(this.alpha - target.alpha) < O
     }
 };
 /**主入口 */
 export function main( /**rgb颜色 */b) {
+    let primaryColor = new Rgb(b[0], b[1], b[2], b[3] || 1)
     let list = [];
-    console.log(b)
-    list.push([X(b)]);
-    var d = lb(rb(b).rotate(180));
-    console.log(d)
-    list.push([X(d)]);
-    let hslTemp1 = rb(b);
-    let temp2 = [hslTemp1.rotate(-30), hslTemp1.rotate(30)];
-    let temp3 = bd(temp2);
-    console.log(temp2)
-    list.push(temp3.yb);
-    b = rb(b);
-    b = [b.rotate(60), b.rotate(120)];
-    console.log(b)
-    b = bd(b);
-    list.push(b.yb);
-    list.forEach((list) => {
-        list.forEach((list) => {
-            list.forEach(({ red, green, blue }) => {
-                let c = chroma.gl(red, green, blue, 1).hex()
-                console.log(c)
-            })
-            console.log('-----')
-        })
-    })
+    console.log('primary', primaryColor)
+    let colorList = [X(primaryColor)]
+    // console.log(colorList)
+    let index = colorList[0].findIndex((color) => primaryColor.isEqual(color))
+    console.log(index)
+    list.push(colorList);
+    new SetColorList(colorList, [index],'主要primary')
+    /**------complementary------- */
+    var complementaryColor = hsl2rgb(rb(primaryColor).rotate(180));
+    // 互补
+    console.log('complementary', complementaryColor)
+    colorList = [X(complementaryColor)]
+    let cIndex = colorList[0].findIndex((color) => complementaryColor.isEqual(color))
+    console.log(cIndex)
+    list.push(colorList);
+    new SetColorList(colorList, [cIndex],'互补complementary')
+
+    /**-------------- */
+    let hslTemp1 = rb(primaryColor);
+    let temp2List = [hslTemp1.rotate(-30), hslTemp1.rotate(30)];
+
+    let temp3 = bd(temp2List);
+    //相似
+    console.log('准备转换的', temp3)
+    let analogousIndexList = []
+    analogousIndexList = temp3.generatorColorList.map((list, i) => list.findIndex((color) => temp3.sourceColorList[i].isEqual(color)))
+    console.log(analogousIndexList)
+    new SetColorList(temp3.generatorColorList, analogousIndexList,'类型analogous')
+
+    list.push(temp3.generatorColorList);
+    /******************** */
+    let hslTemp3 = rb(primaryColor);
+    // console.log(b)
+    let temp4List = [hslTemp3.rotate(60), hslTemp3.rotate(120)];
+    // console.log(b)
+    let temp5 = bd(temp4List);
+    //三元
+    console.log('准备转换的', temp5)
+    let triadicIndexList = []
+    triadicIndexList = temp5.generatorColorList.map((list, i) => list.findIndex((color) => temp5.sourceColorList[i].isEqual(color)))
+    console.log(triadicIndexList)
+    list.push(temp5.generatorColorList);
+    new SetColorList(temp5.generatorColorList, triadicIndexList,'三元triadic')
+    /************* */
+    // list.forEach((list) => {
+    //     list.forEach((list) => {
+    //         list.forEach(({ red, green, blue }) => {
+    //             let c = chroma.gl(red, green, blue, 1).hex()
+    //             console.log(c)
+    //         })
+    //         console.log('-----')
+    //     })
+    // })
     return list
+}
+class SetColorList {
+    constructor(colorList, colorIndexList, message: string) {
+        console.log(colorIndexList)
+        let div = document.createElement('div')
+        div.appendChild(document.createTextNode(message))
+        colorList.forEach((list, i) => {
+            list.forEach(({ red, green, blue }, j) => {
+                let colorDiv = document.createElement('div')
+                colorDiv.style.width = '50px'
+                colorDiv.style.height = '50px'
+                colorDiv.style.backgroundColor = chroma.gl(red, green, blue, 1).hex()
+                console.log(colorIndexList[i], j)
+                colorDiv.style.borderRadius = colorIndexList[i] == j ? '99px' : '';
+                colorDiv.style.display = 'inline-block'
+                div.appendChild(colorDiv)
+            })
+
+        })
+        document.body.appendChild(div)
+    }
+
 }
