@@ -22,6 +22,7 @@
             "main": "src/main.ts",
             "polyfills": "src/polyfills.ts",
             "tsConfig": "tsconfig.app.json",
+            "baseHref":"/material-color-palettes-generator/",
             "aot": true,
             "assets": [
               "src/favicon.ico",
