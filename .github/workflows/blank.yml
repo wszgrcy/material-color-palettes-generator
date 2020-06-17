@@ -40,7 +40,7 @@ jobs:
       - name: build
         run: |
           npm run build
-          cp -rp dist/material-color-palettes-generator/ ../dist
+          cp -rp dist/material-color-palettes/ ../dist
           git branch gh-pages
           git checkout gh-pages
           rm -rf *
